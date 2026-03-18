@@ -1,0 +1,41 @@
+services:
+  # Backend API + WebSocket server
+  - type: web
+    name: webcall-server
+    runtime: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: node src/index.js
+    envVars:
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: webcall-db
+          property: connectionString
+      - key: CORS_ORIGINS
+        value: https://webcall-admin.onrender.com
+      - key: NODE_ENV
+        value: production
+
+  # Admin Panel (static site)
+  - type: web
+    name: webcall-admin
+    runtime: static
+    rootDir: admin
+    buildCommand: echo "No build needed"
+    staticPublishPath: .
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=300
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+databases:
+  - name: webcall-db
+    plan: free

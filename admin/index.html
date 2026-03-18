@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebCall Admin Panel</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Login View -->
+    <div id="login-view" class="view active">
+      <div class="login-container">
+        <div class="login-card">
+          <h1>WebCall</h1>
+          <p class="subtitle">Agent Login</p>
+          <form id="login-form">
+            <div class="form-group">
+              <label for="email">Email</label>
+              <input type="email" id="email" required autocomplete="email" placeholder="agent@example.com">
+            </div>
+            <div class="form-group">
+              <label for="password">Password</label>
+              <input type="password" id="password" required autocomplete="current-password" placeholder="Enter password">
+            </div>
+            <button type="submit" class="btn btn-primary" id="login-btn">Sign In</button>
+            <p class="error-msg" id="login-error"></p>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dashboard View -->
+    <div id="dashboard-view" class="view">
+      <header class="topbar">
+        <div class="topbar-left">
+          <h2>WebCall</h2>
+          <span class="connection-status" id="connection-status">Connecting...</span>
+        </div>
+        <div class="topbar-right">
+          <div class="agent-info">
+            <span id="agent-name"></span>
+            <span class="badge" id="agent-role"></span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="availability-toggle">
+            <span class="toggle-slider"></span>
+            <span class="toggle-label" id="availability-label">Unavailable</span>
+          </label>
+          <button class="btn btn-outline" id="logout-btn">Logout</button>
+        </div>
+      </header>
+
+      <main class="dashboard-content">
+        <!-- Call Notification Banner -->
+        <div class="call-notification" id="call-notification" style="display:none;">
+          <div class="call-notification-content">
+            <div class="call-notification-icon">
+              <div class="phone-ring"></div>
+            </div>
+            <div class="call-notification-info">
+              <h3>Incoming Call</h3>
+              <p id="call-notification-detail">A user is calling...</p>
+              <div class="call-notification-timer" id="call-timer">20s</div>
+            </div>
+            <div class="call-notification-actions">
+              <button class="btn btn-accept" id="call-accept-btn">Accept</button>
+              <button class="btn btn-reject" id="call-reject-btn">Reject</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active Call Panel -->
+        <div class="active-call-panel" id="active-call-panel" style="display:none;">
+          <div class="active-call-content">
+            <div class="call-status-icon active-pulse"></div>
+            <div class="active-call-info">
+              <h3>Call in Progress</h3>
+              <p class="call-duration" id="call-duration">00:00</p>
+            </div>
+            <button class="btn btn-reject" id="call-hangup-btn">Hang Up</button>
+          </div>
+          <audio id="remote-audio" autoplay></audio>
+        </div>
+
+        <div class="panels">
+          <!-- Agents Panel (Admin view) -->
+          <section class="panel" id="agents-panel">
+            <h3>Agents</h3>
+            <div class="agent-list" id="agent-list">
+              <p class="empty-state">Loading agents...</p>
+            </div>
+          </section>
+
+          <!-- Call Logs Panel -->
+          <section class="panel" id="calls-panel">
+            <h3>Recent Calls</h3>
+            <div class="call-log-list" id="call-log-list">
+              <p class="empty-state">No recent calls</p>
+            </div>
+          </section>
+        </div>
+
+        <!-- Admin: Create Agent -->
+        <section class="panel" id="create-agent-panel" style="display:none;">
+          <h3>Create New Agent</h3>
+          <form id="create-agent-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="new-agent-name">Display Name</label>
+                <input type="text" id="new-agent-name" required>
+              </div>
+              <div class="form-group">
+                <label for="new-agent-email">Email</label>
+                <input type="email" id="new-agent-email" required>
+              </div>
+              <div class="form-group">
+                <label for="new-agent-password">Password</label>
+                <input type="password" id="new-agent-password" required minlength="6">
+              </div>
+              <div class="form-group">
+                <label for="new-agent-role">Role</label>
+                <select id="new-agent-role">
+                  <option value="agent">Agent</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+              <button type="submit" class="btn btn-primary">Create</button>
+            </div>
+            <p class="error-msg" id="create-agent-error"></p>
+            <p class="success-msg" id="create-agent-success"></p>
+          </form>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/socket.js"></script>
+  <script src="js/visibility.js"></script>
+  <script src="js/webrtc.js"></script>
+  <script src="js/agents.js"></script>
+  <script src="js/calls.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
