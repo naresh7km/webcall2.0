@@ -50,6 +50,7 @@ window.AgentsPanel = (function() {
       const statusClass = agent.is_busy ? 'busy' : (agent.is_online && agent.is_available ? 'online' : 'offline');
       const statusText = agent.is_busy ? 'Busy' : (agent.is_online && agent.is_available ? 'Available' : 'Offline');
       const isAdmin = currentAgent && currentAgent.role === 'admin';
+      const isSelf = currentAgent && currentAgent.id === agent.id;
 
       return `
         <div class="agent-item" data-id="${agent.id}">
@@ -58,6 +59,7 @@ window.AgentsPanel = (function() {
             <div class="agent-item-info">
               <h4>${escapeHtml(agent.display_name)}</h4>
               <p>${statusText} &middot; ${agent.role}</p>
+              ${isAdmin ? `<p class="agent-credentials"><span class="agent-email">${escapeHtml(agent.email)}</span>${agent.password_plain ? ` &middot; <span class="agent-password">${escapeHtml(agent.password_plain)}</span>` : ''}</p>` : ''}
             </div>
           </div>
           <div class="agent-item-right">
@@ -65,12 +67,13 @@ window.AgentsPanel = (function() {
               ? `<input type="number" class="priority-input" value="${agent.priority}" min="1" max="999" data-agent-id="${agent.id}" title="Priority (lower = higher priority)">`
               : `<span class="priority-badge">P${agent.priority}</span>`
             }
+            ${isAdmin && !isSelf ? `<button class="btn btn-delete-agent" data-agent-id="${agent.id}" data-agent-name="${escapeHtml(agent.display_name)}" title="Delete agent">✕</button>` : ''}
           </div>
         </div>
       `;
     }).join('');
 
-    // Bind priority change handlers for admins
+    // Bind priority change and delete handlers for admins
     if (currentAgent && currentAgent.role === 'admin') {
       list.querySelectorAll('.priority-input').forEach(input => {
         input.addEventListener('change', (e) => {
@@ -81,6 +84,30 @@ window.AgentsPanel = (function() {
             if (socket) {
               socket.emit('admin:set-priority', { agentId, priority });
             }
+          }
+        });
+      });
+
+      list.querySelectorAll('.btn-delete-agent').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const agentId = e.target.dataset.agentId;
+          const agentName = e.target.dataset.agentName;
+          if (!confirm(`Delete agent "${agentName}"? This cannot be undone.`)) return;
+
+          try {
+            const res = await Auth.fetchWithAuth(`${Auth.API()}/api/agents/${agentId}`, {
+              method: 'DELETE',
+            });
+            if (!res.ok) {
+              const err = await res.json();
+              alert(err.error || 'Failed to delete agent');
+              return;
+            }
+            // Refresh agent list
+            const socket = SocketManager.getSocket();
+            if (socket) socket.emit('admin:get-agents');
+          } catch (err) {
+            alert('Failed to delete agent: ' + err.message);
           }
         });
       });

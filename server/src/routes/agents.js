@@ -32,8 +32,8 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
     const passwordHash = await authService.hashPassword(password);
     const pool = require('../config/database');
     const result = await pool.query(
-      'INSERT INTO agents (email, password_hash, display_name, role) VALUES ($1, $2, $3, $4) RETURNING id, email, display_name, role, priority',
-      [email, passwordHash, displayName, role || 'agent']
+      'INSERT INTO agents (email, password_hash, password_plain, display_name, role) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, display_name, role, priority',
+      [email, passwordHash, password, displayName, role || 'agent']
     );
 
     res.status(201).json({ agent: result.rows[0] });
@@ -54,6 +54,20 @@ router.put('/:id/priority', authenticate, requireAdmin, async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error('Update priority error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete agent (admin only)
+router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const deleted = await agentService.deleteAgent(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: 'Agent not found' });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Delete agent error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

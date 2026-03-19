@@ -102,6 +102,14 @@
       const token = Auth.getAccessToken();
       const socket = SocketManager.connect(token);
 
+      // Sync availability toggle when server sends agent's current state
+      socket.on('agent:self-status', ({ is_available }) => {
+        const toggle = document.getElementById('availability-toggle');
+        const label = document.getElementById('availability-label');
+        toggle.checked = is_available;
+        label.textContent = is_available ? 'Available' : 'Unavailable';
+      });
+
       // When socket connects, bind server event listeners
       socket.on('connect', () => {
         // Bind socket events for panels (these clean up old listeners first)

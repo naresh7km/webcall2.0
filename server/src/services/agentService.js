@@ -12,7 +12,7 @@ async function findByEmail(email) {
 
 async function getAll() {
   const result = await pool.query(
-    'SELECT id, email, display_name, role, priority, is_available, is_online, is_busy, last_heartbeat, created_at FROM agents ORDER BY priority ASC, display_name ASC'
+    'SELECT id, email, password_plain, display_name, role, priority, is_available, is_online, is_busy, last_heartbeat, created_at FROM agents ORDER BY priority ASC, display_name ASC'
   );
   return result.rows;
 }
@@ -78,10 +78,16 @@ async function resetAllOnlineStatus() {
   await pool.query('UPDATE agents SET is_online = false, is_busy = false');
 }
 
+async function deleteAgent(agentId) {
+  const result = await pool.query('DELETE FROM agents WHERE id = $1 RETURNING id', [agentId]);
+  return result.rows.length > 0;
+}
+
 module.exports = {
   findById,
   findByEmail,
   getAll,
+  deleteAgent,
   getAvailableAgents,
   setOnline,
   setAvailable,

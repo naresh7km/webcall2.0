@@ -11,9 +11,21 @@ module.exports = function adminHandler(socket) {
   // Register socket in call manager
   callManager.registerAgentSocket(agentId, socket);
 
-  // Mark agent online
-  agentService.setOnline(agentId, true).then(() => {
-    callManager.broadcastAgentStatus(socket);
+  // Mark agent online and send their current status back
+  agentService.setOnline(agentId, true).then(async () => {
+    try {
+      const agent = await agentService.findById(agentId);
+      if (agent) {
+        socket.emit('agent:self-status', {
+          is_available: agent.is_available,
+          is_online: agent.is_online,
+          is_busy: agent.is_busy,
+        });
+      }
+      callManager.broadcastAgentStatus(socket);
+    } catch (err) {
+      logger.error('Failed to send self-status:', err);
+    }
   });
 
   // Heartbeat
