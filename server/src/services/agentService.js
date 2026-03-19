@@ -79,6 +79,8 @@ async function resetAllOnlineStatus() {
 }
 
 async function deleteAgent(agentId) {
+  // Nullify agent reference in call_logs first (FK has no CASCADE)
+  await pool.query('UPDATE call_logs SET agent_id = NULL WHERE agent_id = $1', [agentId]);
   const result = await pool.query('DELETE FROM agents WHERE id = $1 RETURNING id', [agentId]);
   return result.rows.length > 0;
 }
