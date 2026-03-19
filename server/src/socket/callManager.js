@@ -69,7 +69,10 @@ class CallManager {
     if (!call || call.status === 'active' || call.status === 'ended') return;
 
     const availableAgents = await agentService.getAvailableAgents();
+    logger.info(`Call ${callId}: available agents from DB: ${availableAgents.map(a => a.id).join(', ') || 'none'}`);
+    logger.info(`Call ${callId}: registered agent sockets: ${[...this.agentSockets.keys()].join(', ') || 'none'}`);
     const candidates = availableAgents.filter(a => !call.attemptedAgents.includes(a.id));
+    logger.info(`Call ${callId}: candidates after filtering attempted: ${candidates.map(a => a.id).join(', ') || 'none'}`);
 
     if (candidates.length === 0) {
       // No agents left to try

@@ -17,20 +17,32 @@ const logger = require('./utils/logger');
 const app = express();
 const server = http.createServer(app);
 
-// Socket.IO with CORS
+// Socket.IO with CORS - use origin callback to allow any origin dynamically
+// (credentials:true + wildcard '*' is invalid per CORS spec)
 const io = new Server(server, {
   cors: {
-    origin: env.corsOrigins.concat(['*']),
+    origin: function(origin, callback) {
+      // Allow requests with no origin (mobile apps, curl, etc.)
+      // and any origin (widget can be embedded anywhere)
+      callback(null, true);
+    },
     methods: ['GET', 'POST'],
     credentials: true,
   },
   pingInterval: 10000,
   pingTimeout: 5000,
+  // Allow both transports, try websocket first
+  transports: ['websocket', 'polling'],
 });
 
 // Middleware
 app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors({ origin: env.corsOrigins.concat(['*']), credentials: true }));
+app.use(cors({
+  origin: function(origin, callback) {
+    callback(null, true);
+  },
+  credentials: true,
+}));
 app.use(express.json());
 
 // Health check

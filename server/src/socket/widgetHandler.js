@@ -2,7 +2,7 @@ const callManager = require('./callManager');
 const logger = require('../utils/logger');
 
 module.exports = function widgetHandler(socket) {
-  logger.debug(`Widget client connected: ${socket.id}`);
+  logger.info(`Widget client connected: ${socket.id}`);
 
   // Initiate a call
   socket.on('call:initiate', async ({ metadata }) => {
@@ -35,7 +35,7 @@ module.exports = function widgetHandler(socket) {
 
   // Disconnect
   socket.on('disconnect', () => {
-    logger.debug(`Widget client disconnected: ${socket.id}`);
+    logger.info(`Widget client disconnected: ${socket.id}`);
     callManager.unregisterCallerSocket(socket.id);
   });
 };

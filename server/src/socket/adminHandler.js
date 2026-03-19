@@ -85,7 +85,17 @@ module.exports = function adminHandler(socket) {
     callManager.relayToCaller(callId, 'webrtc:ice-candidate', { candidate });
   });
 
-  // Admin: set priority
+  // Get agent list - available to all roles so agents can see who's online
+  socket.on('admin:get-agents', async () => {
+    try {
+      const agents = await agentService.getAll();
+      socket.emit('admin:agents-list', { agents });
+    } catch (err) {
+      logger.error('Get agents error:', err);
+    }
+  });
+
+  // Admin-only: set priority
   if (agentRole === 'admin') {
     socket.on('admin:set-priority', async ({ agentId: targetId, priority }) => {
       try {
@@ -93,15 +103,6 @@ module.exports = function adminHandler(socket) {
         callManager.broadcastAgentStatus(socket);
       } catch (err) {
         logger.error('Set priority error:', err);
-      }
-    });
-
-    socket.on('admin:get-agents', async () => {
-      try {
-        const agents = await agentService.getAll();
-        socket.emit('admin:agents-list', { agents });
-      } catch (err) {
-        logger.error('Get agents error:', err);
       }
     });
   }
