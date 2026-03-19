@@ -1,10 +1,14 @@
 window.SocketManager = (function() {
   let socket = null;
-  let reconnectTimer = null;
-  const listeners = {};
+  const localListeners = {};  // For internal app events only (connected, disconnected, auth-error)
 
   function connect(token) {
-    if (socket && socket.connected) return socket;
+    // Disconnect existing socket cleanly before creating a new one
+    if (socket) {
+      socket.removeAllListeners();
+      socket.disconnect();
+      socket = null;
+    }
 
     const url = window.WEBCALL_CONFIG.API_URL + '/admin';
 
@@ -12,20 +16,21 @@ window.SocketManager = (function() {
       auth: { token },
       reconnection: true,
       reconnectionDelay: 1000,
-      reconnectionAttempts: 50,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 10,
       transports: ['websocket', 'polling'],
     });
 
     socket.on('connect', () => {
-      console.log('Socket connected');
+      console.log('Socket connected, id:', socket.id);
       updateConnectionUI('connected', 'Connected');
-      emit('connected');
+      fireLocal('connected');
     });
 
     socket.on('disconnect', (reason) => {
       console.log('Socket disconnected:', reason);
       updateConnectionUI('disconnected', 'Disconnected');
-      emit('disconnected', reason);
+      fireLocal('disconnected', reason);
     });
 
     socket.on('connect_error', async (err) => {
@@ -33,13 +38,15 @@ window.SocketManager = (function() {
       updateConnectionUI('disconnected', 'Connection Error');
 
       // Try token refresh on auth errors
-      if (err.message.includes('expired') || err.message.includes('Invalid')) {
+      if (err.message.includes('expired') || err.message.includes('Invalid') || err.message.includes('Authentication')) {
+        socket.disconnect(); // Stop reconnection attempts
         const refreshed = await Auth.refreshToken();
         if (refreshed) {
+          // Reconnect with new token
           socket.auth = { token: refreshed.accessToken };
           socket.connect();
         } else {
-          emit('auth-error');
+          fireLocal('auth-error');
         }
       }
     });
@@ -49,6 +56,7 @@ window.SocketManager = (function() {
 
   function disconnect() {
     if (socket) {
+      socket.removeAllListeners();
       socket.disconnect();
       socket = null;
     }
@@ -58,26 +66,24 @@ window.SocketManager = (function() {
     return socket;
   }
 
+  // Register a handler on the actual socket (for server events)
   function on(event, handler) {
     if (socket) socket.on(event, handler);
-    if (!listeners[event]) listeners[event] = [];
-    listeners[event].push(handler);
   }
 
   function off(event, handler) {
     if (socket) socket.off(event, handler);
-    if (listeners[event]) {
-      listeners[event] = listeners[event].filter(h => h !== handler);
-    }
   }
 
-  function emit(event, data) {
-    if (socket && socket.connected) {
-      socket.emit(event, data);
-    }
-    // Also fire local listeners for internal events
-    if (listeners[event]) {
-      listeners[event].forEach(h => h(data));
+  // Register a handler for local-only app events (connected, disconnected, auth-error)
+  function onLocal(event, handler) {
+    if (!localListeners[event]) localListeners[event] = [];
+    localListeners[event].push(handler);
+  }
+
+  function fireLocal(event, data) {
+    if (localListeners[event]) {
+      localListeners[event].forEach(h => h(data));
     }
   }
 
@@ -89,5 +95,5 @@ window.SocketManager = (function() {
     }
   }
 
-  return { connect, disconnect, getSocket, on, off, emit };
+  return { connect, disconnect, getSocket, on, off, onLocal };
 })();

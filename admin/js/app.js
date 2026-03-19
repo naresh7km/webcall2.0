@@ -2,6 +2,7 @@
 (function() {
   const loginView = document.getElementById('login-view');
   const dashboardView = document.getElementById('dashboard-view');
+  let dashboardInitialized = false;
 
   function showView(view) {
     loginView.classList.remove('active');
@@ -44,6 +45,7 @@
     Visibility.stop();
     SocketManager.disconnect();
     await Auth.logout();
+    dashboardInitialized = false;
     showView(loginView);
   });
 
@@ -53,7 +55,7 @@
     const label = document.getElementById('availability-label');
     label.textContent = available ? 'Available' : 'Unavailable';
     const socket = SocketManager.getSocket();
-    if (socket) {
+    if (socket && socket.connected) {
       socket.emit('agent:set-available', { available });
     }
   });
@@ -73,25 +75,43 @@
 
     showView(dashboardView);
 
+    // Init panels (DOM-only setup, safe to call multiple times)
+    AgentsPanel.init(agent);
+    CallsPanel.init();
+
     // Load Socket.IO dynamically if not already loaded
     loadSocketIO(() => {
       // Connect socket
       const token = Auth.getAccessToken();
-      SocketManager.connect(token);
+      const socket = SocketManager.connect(token);
 
-      // Init modules
+      // When socket connects, bind server event listeners
+      socket.on('connect', () => {
+        // Bind socket events for panels (these clean up old listeners first)
+        AgentsPanel.bindSocketEvents(socket);
+        CallsPanel.bindSocketEvents(socket);
+      });
+
+      // If already connected (synchronous), bind immediately
+      if (socket.connected) {
+        AgentsPanel.bindSocketEvents(socket);
+        CallsPanel.bindSocketEvents(socket);
+      }
+
+      // Start visibility/heartbeat tracking
       Visibility.start();
-      AgentsPanel.init(agent);
-      CallsPanel.init();
 
       // Handle auth errors from socket
-      SocketManager.on('auth-error', () => {
+      SocketManager.onLocal('auth-error', () => {
         Visibility.stop();
         SocketManager.disconnect();
         Auth.clear();
+        dashboardInitialized = false;
         showView(loginView);
       });
     });
+
+    dashboardInitialized = true;
   }
 
   function loadSocketIO(callback) {

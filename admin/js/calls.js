@@ -4,37 +4,48 @@ window.CallsPanel = (function() {
   let callStartTime = null;
   let ringTimerInterval = null;
   let ringtoneAudio = null;
+  let initialized = false;
 
   function init() {
-    const socket = SocketManager.getSocket();
-    if (!socket) return;
+    // Prevent duplicate event registration on reconnect
+    if (initialized) {
+      loadCallLogs();
+      return;
+    }
+    initialized = true;
 
-    // Incoming call
-    socket.on('call:incoming', handleIncomingCall);
-
-    // Call connected - start WebRTC
-    socket.on('call:connected', handleCallConnected);
-
-    // WebRTC offer from caller
-    socket.on('webrtc:offer', ({ callId, sdp }) => {
-      WebRTCManager.handleOffer(callId, sdp);
-    });
-
-    // ICE candidates
-    socket.on('webrtc:ice-candidate', ({ candidate }) => {
-      WebRTCManager.addIceCandidate(candidate);
-    });
-
-    // Call ended
-    socket.on('call:ended', handleCallEnded);
-
-    // Button handlers
+    // Button handlers (DOM listeners only need to be bound once)
     document.getElementById('call-accept-btn').addEventListener('click', acceptCall);
     document.getElementById('call-reject-btn').addEventListener('click', rejectCall);
     document.getElementById('call-hangup-btn').addEventListener('click', hangupCall);
 
     // Load call logs
     loadCallLogs();
+  }
+
+  // Called after socket connects to bind socket-specific events
+  function bindSocketEvents(socket) {
+    // Remove any previous listeners to prevent duplicates
+    socket.off('call:incoming', handleIncomingCall);
+    socket.off('call:connected', handleCallConnected);
+    socket.off('webrtc:offer', handleWebRTCOffer);
+    socket.off('webrtc:ice-candidate', handleWebRTCIce);
+    socket.off('call:ended', handleCallEnded);
+
+    // Re-register
+    socket.on('call:incoming', handleIncomingCall);
+    socket.on('call:connected', handleCallConnected);
+    socket.on('webrtc:offer', handleWebRTCOffer);
+    socket.on('webrtc:ice-candidate', handleWebRTCIce);
+    socket.on('call:ended', handleCallEnded);
+  }
+
+  function handleWebRTCOffer({ callId, sdp }) {
+    WebRTCManager.handleOffer(callId, sdp);
+  }
+
+  function handleWebRTCIce({ candidate }) {
+    WebRTCManager.addIceCandidate(candidate);
   }
 
   function handleIncomingCall({ callId, callerId, timeout }) {
@@ -51,6 +62,7 @@ window.CallsPanel = (function() {
     // Start countdown
     let remaining = timeout || 20;
     document.getElementById('call-timer').textContent = `${remaining}s`;
+    clearInterval(ringTimerInterval);
     ringTimerInterval = setInterval(() => {
       remaining--;
       document.getElementById('call-timer').textContent = `${remaining}s`;
@@ -70,6 +82,7 @@ window.CallsPanel = (function() {
 
     // Start duration timer
     callStartTime = Date.now();
+    clearInterval(callTimerInterval);
     callTimerInterval = setInterval(() => {
       const elapsed = Math.floor((Date.now() - callStartTime) / 1000);
       const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
@@ -133,10 +146,10 @@ window.CallsPanel = (function() {
 
   function playRingtone() {
     stopRingtone();
-    // Use a simple oscillator-based ringtone since we can't bundle audio files
     try {
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       const playTone = () => {
+        if (audioCtx.state === 'closed') return;
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = 'sine';
@@ -149,8 +162,8 @@ window.CallsPanel = (function() {
         osc.stop(audioCtx.currentTime + 0.4);
       };
       playTone();
-      ringtoneAudio = setInterval(playTone, 1500);
-      ringtoneAudio = { interval: ringtoneAudio, ctx: audioCtx };
+      const interval = setInterval(playTone, 1500);
+      ringtoneAudio = { interval, ctx: audioCtx };
     } catch (err) {
       console.warn('Could not play ringtone:', err);
     }
@@ -159,7 +172,9 @@ window.CallsPanel = (function() {
   function stopRingtone() {
     if (ringtoneAudio) {
       clearInterval(ringtoneAudio.interval);
-      if (ringtoneAudio.ctx) ringtoneAudio.ctx.close().catch(() => {});
+      if (ringtoneAudio.ctx && ringtoneAudio.ctx.state !== 'closed') {
+        ringtoneAudio.ctx.close().catch(() => {});
+      }
       ringtoneAudio = null;
     }
   }
@@ -200,5 +215,5 @@ window.CallsPanel = (function() {
     }).join('');
   }
 
-  return { init, loadCallLogs };
+  return { init, bindSocketEvents, loadCallLogs };
 })();

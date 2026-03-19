@@ -1,6 +1,7 @@
 window.AgentsPanel = (function() {
   let agents = [];
   let currentAgent = null;
+  let initialized = false;
 
   function init(agent) {
     currentAgent = agent;
@@ -8,25 +9,34 @@ window.AgentsPanel = (function() {
     // Show create-agent form for admins
     if (agent.role === 'admin') {
       document.getElementById('create-agent-panel').style.display = 'block';
-      setupCreateForm();
+      if (!initialized) {
+        setupCreateForm();
+      }
     }
 
-    // Listen for agent status updates
-    const socket = SocketManager.getSocket();
-    if (socket) {
-      socket.on('agents:status-update', ({ agents: updated }) => {
-        agents = updated;
-        render();
-      });
+    initialized = true;
+  }
 
-      socket.on('admin:agents-list', ({ agents: list }) => {
-        agents = list;
-        render();
-      });
+  // Called after socket connects to bind socket-specific events
+  function bindSocketEvents(socket) {
+    socket.off('agents:status-update', handleStatusUpdate);
+    socket.off('admin:agents-list', handleAgentsList);
 
-      // Request initial list
-      socket.emit('admin:get-agents');
-    }
+    socket.on('agents:status-update', handleStatusUpdate);
+    socket.on('admin:agents-list', handleAgentsList);
+
+    // Request initial agent list (works for admin role; agents get it via broadcast)
+    socket.emit('admin:get-agents');
+  }
+
+  function handleStatusUpdate({ agents: updated }) {
+    agents = updated;
+    render();
+  }
+
+  function handleAgentsList({ agents: list }) {
+    agents = list;
+    render();
   }
 
   function render() {
@@ -60,7 +70,7 @@ window.AgentsPanel = (function() {
       `;
     }).join('');
 
-    // Bind priority change handlers
+    // Bind priority change handlers for admins
     if (currentAgent && currentAgent.role === 'admin') {
       list.querySelectorAll('.priority-input').forEach(input => {
         input.addEventListener('change', (e) => {
@@ -121,5 +131,5 @@ window.AgentsPanel = (function() {
     return div.innerHTML;
   }
 
-  return { init, render };
+  return { init, bindSocketEvents, render };
 })();
