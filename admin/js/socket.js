@@ -18,7 +18,8 @@ window.SocketManager = (function() {
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       reconnectionAttempts: 10,
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'],
+      upgrade: true,
     });
 
     socket.on('connect', () => {

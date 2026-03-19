@@ -9,7 +9,7 @@ async function createCall(callerId, metadata = {}) {
 }
 
 async function updateCallStatus(callId, status, extra = {}) {
-  const sets = ['status = $2', 'updated_at = NOW()'];
+  const sets = ['status = $2'];
   const values = [callId, status];
   let idx = 3;
 
