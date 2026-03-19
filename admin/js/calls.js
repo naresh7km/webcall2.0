@@ -95,7 +95,7 @@ window.CallsPanel = (function() {
   function handleCallEnded({ callId, reason }) {
     hideCallNotification();
     hideActiveCall();
-    WebRTCManager.cleanup();
+    WebRTCManager.cleanupConnection(); // Keep mic alive for next call
     currentCallId = null;
     loadCallLogs();
   }
@@ -158,7 +158,7 @@ window.CallsPanel = (function() {
       socket.emit('call:hangup', { callId });
     }
     hideActiveCall();
-    WebRTCManager.cleanup();
+    WebRTCManager.cleanupConnection(); // Keep mic alive for next call
     currentCallId = null;
     loadCallLogs();
   }
@@ -181,8 +181,16 @@ window.CallsPanel = (function() {
     stopRingtone();
     try {
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      // Resume AudioContext in case browser suspended it (autoplay policy)
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
       const playTone = () => {
-        if (audioCtx.state === 'closed') return;
+        if (!audioCtx || audioCtx.state === 'closed') return;
+        // Resume each time in case it got suspended between tones
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume().catch(() => {});
+        }
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = 'sine';

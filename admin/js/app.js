@@ -61,6 +61,7 @@
   document.getElementById('logout-btn').addEventListener('click', async () => {
     Visibility.stop();
     SocketManager.disconnect();
+    WebRTCManager.cleanup(); // Full cleanup including mic on logout
     await Auth.logout();
     dashboardInitialized = false;
     showView(loginView);
@@ -91,6 +92,11 @@
     roleEl.className = `badge badge-${agent.role}`;
 
     showView(dashboardView);
+
+    // Pre-acquire microphone immediately on dashboard load.
+    // This ensures the browser permission is granted early (from user gesture of login click)
+    // and the mic stream is ready instantly when a call comes in.
+    WebRTCManager.acquireMic();
 
     // Init panels (DOM-only setup, safe to call multiple times)
     AgentsPanel.init(agent);
