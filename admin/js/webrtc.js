@@ -89,9 +89,23 @@ window.WebRTCManager = (function() {
     currentCallId = null;
   }
 
+  function toggleMute() {
+    if (!localStream) return false;
+    const audioTrack = localStream.getAudioTracks()[0];
+    if (!audioTrack) return false;
+    audioTrack.enabled = !audioTrack.enabled;
+    return !audioTrack.enabled; // returns true if now muted
+  }
+
+  function isMuted() {
+    if (!localStream) return false;
+    const audioTrack = localStream.getAudioTracks()[0];
+    return audioTrack ? !audioTrack.enabled : false;
+  }
+
   function getCurrentCallId() {
     return currentCallId;
   }
 
-  return { handleOffer, addIceCandidate, cleanup, getCurrentCallId };
+  return { handleOffer, addIceCandidate, cleanup, getCurrentCallId, toggleMute, isMuted };
 })();

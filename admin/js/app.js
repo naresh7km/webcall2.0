@@ -4,6 +4,23 @@
   const dashboardView = document.getElementById('dashboard-view');
   let dashboardInitialized = false;
 
+  // Hamburger menu toggle
+  const menuBtn = document.getElementById('topbar-menu-btn');
+  const topbarRight = document.getElementById('topbar-right');
+  if (menuBtn && topbarRight) {
+    menuBtn.addEventListener('click', () => {
+      menuBtn.classList.toggle('active');
+      topbarRight.classList.toggle('open');
+    });
+    // Close menu when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.topbar')) {
+        menuBtn.classList.remove('active');
+        topbarRight.classList.remove('open');
+      }
+    });
+  }
+
   function showView(view) {
     loginView.classList.remove('active');
     dashboardView.classList.remove('active');

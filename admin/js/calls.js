@@ -18,6 +18,7 @@ window.CallsPanel = (function() {
     document.getElementById('call-accept-btn').addEventListener('click', acceptCall);
     document.getElementById('call-reject-btn').addEventListener('click', rejectCall);
     document.getElementById('call-hangup-btn').addEventListener('click', hangupCall);
+    document.getElementById('call-mute-btn').addEventListener('click', toggleMute);
 
     // Load call logs
     loadCallLogs();
@@ -118,6 +119,37 @@ window.CallsPanel = (function() {
     currentCallId = null;
   }
 
+  function toggleMute() {
+    const muted = WebRTCManager.toggleMute();
+    const btn = document.getElementById('call-mute-btn');
+    const label = btn.querySelector('.mute-label');
+    const unmutedIcon = btn.querySelector('.mute-icon.unmuted');
+    const mutedIcon = btn.querySelector('.mute-icon.muted');
+
+    if (muted) {
+      btn.classList.add('is-muted');
+      label.textContent = 'Unmute';
+      unmutedIcon.style.display = 'none';
+      mutedIcon.style.display = '';
+    } else {
+      btn.classList.remove('is-muted');
+      label.textContent = 'Mute';
+      unmutedIcon.style.display = '';
+      mutedIcon.style.display = 'none';
+    }
+  }
+
+  function resetMuteUI() {
+    const btn = document.getElementById('call-mute-btn');
+    const label = btn.querySelector('.mute-label');
+    const unmutedIcon = btn.querySelector('.mute-icon.unmuted');
+    const mutedIcon = btn.querySelector('.mute-icon.muted');
+    btn.classList.remove('is-muted');
+    label.textContent = 'Mute';
+    unmutedIcon.style.display = '';
+    mutedIcon.style.display = 'none';
+  }
+
   function hangupCall() {
     const callId = currentCallId || WebRTCManager.getCurrentCallId();
     if (!callId) return;
@@ -142,6 +174,7 @@ window.CallsPanel = (function() {
     document.getElementById('call-duration').textContent = '00:00';
     clearInterval(callTimerInterval);
     callStartTime = null;
+    resetMuteUI();
   }
 
   function playRingtone() {
