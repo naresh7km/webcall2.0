@@ -186,6 +186,8 @@
   let callStartTime = null;
   let ringtoneCtx = null;
   let ringtoneInterval = null;
+  let pendingCandidates = [];
+  let remoteDescriptionSet = false;
 
   // ========== Inject CSS ==========
   const styleEl = document.createElement('style');
@@ -236,12 +238,22 @@
   }
 
   function connectSocket() {
-    socket = io(SERVER_URL + '/widget', {
-      transports: ['websocket', 'polling'],
-      reconnection: false,
-    });
+    try {
+      socket = io(SERVER_URL + '/widget', {
+        transports: ['polling', 'websocket'],
+        upgrade: true,
+        reconnection: false,
+        timeout: 10000,
+      });
+    } catch (err) {
+      console.error('WebCall: Failed to create socket', err);
+      setState('error');
+      showModal('error', 'Connection Failed', 'Unable to initialize connection.');
+      return;
+    }
 
     socket.on('connect', () => {
+      console.log('WebCall: Connected to server');
       socket.emit('call:initiate', {
         metadata: {
           origin: window.location.href,
@@ -251,7 +263,8 @@
       });
     });
 
-    socket.on('connect_error', () => {
+    socket.on('connect_error', (err) => {
+      console.error('WebCall: Connection error', err.message);
       setState('error');
       showModal('error', 'Connection Failed', 'Unable to reach the server. Please try again later.');
     });
@@ -292,20 +305,44 @@
       showModal('ended', 'Call Ended', 'The call has been disconnected.');
     });
 
-    socket.on('webrtc:answer', ({ sdp }) => {
+    socket.on('webrtc:answer', async ({ sdp }) => {
       if (peerConnection) {
-        peerConnection.setRemoteDescription(new RTCSessionDescription(sdp)).catch(console.error);
+        try {
+          await peerConnection.setRemoteDescription(new RTCSessionDescription(sdp));
+          console.log('WebCall: Remote description (answer) set');
+          // Flush buffered ICE candidates
+          remoteDescriptionSet = true;
+          if (pendingCandidates.length > 0) {
+            console.log(`WebCall: Flushing ${pendingCandidates.length} buffered ICE candidates`);
+            for (const c of pendingCandidates) {
+              await peerConnection.addIceCandidate(new RTCIceCandidate(c)).catch(err =>
+                console.warn('WebCall: Buffered ICE candidate error:', err)
+              );
+            }
+            pendingCandidates = [];
+          }
+        } catch (err) {
+          console.error('WebCall: Failed to set remote description:', err);
+        }
       }
     });
 
     socket.on('webrtc:ice-candidate', ({ candidate }) => {
-      if (peerConnection && candidate) {
-        peerConnection.addIceCandidate(new RTCIceCandidate(candidate)).catch(console.error);
+      if (!candidate || !peerConnection) return;
+      if (!remoteDescriptionSet) {
+        console.log('WebCall: Buffering ICE candidate (remote description not set yet)');
+        pendingCandidates.push(candidate);
+        return;
       }
+      peerConnection.addIceCandidate(new RTCIceCandidate(candidate)).catch(err =>
+        console.warn('WebCall: ICE candidate error:', err)
+      );
     });
 
     socket.on('disconnect', () => {
-      if (state === 'active') {
+      console.log('WebCall: Socket disconnected, state:', state);
+      if (state === 'active' || state === 'ringing' || state === 'connecting') {
+        stopRingtone();
         setState('ended');
         cleanup();
         showModal('ended', 'Call Ended', 'Connection lost.');
@@ -317,7 +354,29 @@
     const ICE_SERVERS = [
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun3.l.google.com:19302' },
+      // TURN servers for NAT traversal reliability
+      {
+        urls: 'turn:openrelay.metered.ca:80',
+        username: 'openrelayproject',
+        credential: 'openrelayproject',
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443',
+        username: 'openrelayproject',
+        credential: 'openrelayproject',
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+        username: 'openrelayproject',
+        credential: 'openrelayproject',
+      },
     ];
+
+    // Reset buffering state
+    pendingCandidates = [];
+    remoteDescriptionSet = false;
 
     peerConnection = new RTCPeerConnection({ iceServers: ICE_SERVERS });
 
@@ -328,28 +387,56 @@
     };
 
     peerConnection.ontrack = (event) => {
+      console.log('WebCall: ontrack fired, streams:', event.streams.length);
       let audio = document.getElementById('webcall-remote-audio');
       if (!audio) {
         audio = document.createElement('audio');
         audio.id = 'webcall-remote-audio';
         audio.autoplay = true;
+        audio.playsInline = true;
         document.body.appendChild(audio);
       }
       if (event.streams[0]) {
         audio.srcObject = event.streams[0];
+        // Force play in case autoplay policy blocks it
+        audio.play().catch(err => console.warn('WebCall: audio.play() failed:', err));
       }
     };
 
     peerConnection.oniceconnectionstatechange = () => {
-      if (peerConnection.iceConnectionState === 'failed') {
-        hangup();
-        showModal('error', 'Connection Failed', 'Audio connection could not be established.');
+      const iceState = peerConnection ? peerConnection.iceConnectionState : 'no-pc';
+      console.log('WebCall: ICE connection state:', iceState);
+
+      if (iceState === 'connected' || iceState === 'completed') {
+        console.log('WebCall: Audio connection established');
       }
+
+      if (iceState === 'failed') {
+        console.warn('WebCall: ICE failed, attempting restart');
+        if (peerConnection) {
+          peerConnection.restartIce();
+        }
+      }
+
+      if (iceState === 'disconnected') {
+        console.warn('WebCall: ICE disconnected, waiting for recovery...');
+        setTimeout(() => {
+          if (peerConnection && peerConnection.iceConnectionState === 'disconnected') {
+            console.warn('WebCall: ICE still disconnected, restarting');
+            peerConnection.restartIce();
+          }
+        }, 3000);
+      }
+    };
+
+    peerConnection.onicegatheringstatechange = () => {
+      console.log('WebCall: ICE gathering state:', peerConnection ? peerConnection.iceGatheringState : 'no-pc');
     };
 
     try {
       localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
       localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+      console.log('WebCall: Local audio track added');
     } catch (err) {
       setState('error');
       cleanup();
@@ -360,13 +447,14 @@
     try {
       const offer = await peerConnection.createOffer();
       await peerConnection.setLocalDescription(offer);
+      console.log('WebCall: Offer created and local description set');
       socket.emit('webrtc:offer', { callId, sdp: offer });
 
       // Show active call UI
       callStartTime = Date.now();
       showActiveCallModal();
     } catch (err) {
-      console.error('WebRTC error:', err);
+      console.error('WebCall: WebRTC offer error:', err);
       setState('error');
       cleanup();
       showModal('error', 'Call Error', 'Failed to establish audio connection.');
@@ -406,6 +494,8 @@
     }
     callId = null;
     callStartTime = null;
+    pendingCandidates = [];
+    remoteDescriptionSet = false;
     const audio = document.getElementById('webcall-remote-audio');
     if (audio) audio.srcObject = null;
   }

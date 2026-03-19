@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebCall Widget Test Page</title>
+    <style>
+      body {
+        font-family: -apple-system, sans-serif;
+        max-width: 800px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      h1 {
+        color: #1a1a2e;
+      }
+      p {
+        color: #475569;
+        line-height: 1.6;
+      }
+      .code {
+        background: #f1f5f9;
+        padding: 1rem;
+        border-radius: 8px;
+        font-family: monospace;
+        font-size: 0.875rem;
+        overflow-x: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>WebCall Widget Test</h1>
+    <p>
+      This page demonstrates the WebCall widget. You should see a floating phone
+      button at the bottom-left corner.
+    </p>
+    <p>Click the button to initiate a test call to the support system.</p>
+
+    <h2>Integration Code</h2>
+    <div class="code">
+      &lt;script
+      src="https://webcall2backendserver.onrender.com/widget/webcall-widget.js"<br />
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;data-server="https://webcall2backendserver.onrender.com"&gt;<br />
+      &lt;/script&gt;
+    </div>
+
+    <!-- WebCall Widget -->
+    <script
+      src="webcall-widget.js"
+      data-server="https://webcall2backendserver.onrender.com"
+    ></script>
+  </body>
+</html>
